@@ -8,14 +8,22 @@ const options = {
 const getAllCryptoAndFiat = async (req, res) => {
   try {
     const cryptoURL = `https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?start=1&limit=100`;
+    const fiatURL = `https://pro-api.coinmarketcap.com/v1/fiat/map`;
 
-    const { data } = await axios.get(cryptoURL, options);
+    const [cryptoResponse, fiatResponse] = await Promise.all([
+      axios.get(cryptoURL, options),
+      axios.get(fiatURL, options),
+    ]);
 
-    if (data.status.error_code || data.status.error_message) {
-      throw new Error(data.status.error_message);
+    if (cryptoResponse.data.status.error_code) {
+      throw new Error(cryptoResponse.data.status.error_message);
     }
 
-    const cryptoData = data.data.map((crypto) => {
+    if (fiatResponse.data.status.error_code) {
+      throw new Error(fiatResponse.data.status.error_message);
+    }
+
+    const cryptoData = cryptoResponse.data.data.map((crypto) => {
       return {
         id: crypto.id,
         name: crypto.name,
@@ -23,19 +31,13 @@ const getAllCryptoAndFiat = async (req, res) => {
       };
     });
 
-    const fiatURL = `https://pro-api.coinmarketcap.com/v1/fiat/map`;
-
-    const { data: fiatData } = await axios.get(fiatURL, options);
-
-    if (fiatData.status.error_code || fiatData.status.error_message) {
-      throw new Error(fiatData.status.error_message);
-    }
+    const fiatData = fiatResponse.data.data;
 
     res.send({
       status: "success",
       data: {
         crypto_list: cryptoData,
-        fiat_list: fiatData.data,
+        fiat_list: fiatData,
       },
     });
   } catch (err) {
